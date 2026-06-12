@@ -2,12 +2,13 @@ package repository
 
 import (
 	"context"
-	
+	"time"
 
 	db "ainyx-user-api/db/sqlc/generated"
 	"ainyx-user-api/internal/models"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type UserRepository struct {
@@ -31,32 +32,35 @@ func mapSQLCUser(user db.User) models.User {
 
 func (r *UserRepository) CreateUser(user models.CreateUserRequest) (models.User, error) {
 
-	var createdUser models.User
+	parsedTime, err := time.Parse("2006-01-02", user.DOB)
 
-	query := `
-		INSERT INTO users(name, dob)
-		VALUES($1, $2)
-		RETURNING id, name, dob
-	`
+if err != nil {
+	return models.User{}, err
+}
 
-	err := r.DB.QueryRow(
+dob := pgtype.Date{
+	Time:  parsedTime,
+	Valid: true,
+}
+
+	if err != nil {
+		return models.User{}, err
+	}
+
+	createdUser, err := r.Queries.CreateUser(
 		context.Background(),
-		query,
-		user.Name,
-		user.DOB,
-	).Scan(
-		&createdUser.ID,
-		&createdUser.Name,
-		&createdUser.DOB,
+		db.CreateUserParams{
+			Name: user.Name,
+			Dob:  dob,
+		},
 	)
 
 	if err != nil {
 		return models.User{}, err
 	}
 
-	return createdUser, nil
+	return mapSQLCUser(createdUser), nil
 }
-
 func (r *UserRepository) GetUserByID(id int) (models.User, error) {
 
 	user, err := r.Queries.GetUserByID(
@@ -73,88 +77,57 @@ func (r *UserRepository) GetUserByID(id int) (models.User, error) {
 
 func (r *UserRepository) GetAllUsers() ([]models.User, error) {
 
-	query := `
-		SELECT id, name, dob
-		FROM users
-		ORDER BY id
-	`
-
-	rows, err := r.DB.Query(
-		context.Background(),
-		query,
-	)
+	users, err := r.Queries.GetAllUsers(context.Background())
 
 	if err != nil {
 		return nil, err
 	}
 
-	defer rows.Close()
+	var result []models.User
 
-	var users []models.User
-
-	for rows.Next() {
-
-		var user models.User
-
-		err := rows.Scan(
-			&user.ID,
-			&user.Name,
-			&user.DOB,
-		)
-
-		if err != nil {
-			return nil, err
-		}
-
-		users = append(users, user)
+	for _, user := range users {
+		result = append(result, mapSQLCUser(user))
 	}
 
-	return users, nil
+	return result, nil
 }
 
 func (r *UserRepository) UpdateUser(id int, user models.UpdateUserRequest) (models.User, error) {
 
-	var updatedUser models.User
+	parsedTime, err := time.Parse("2006-01-02", user.DOB)
 
-	query := `
-		UPDATE users
-		SET name = $1,
-		    dob = $2
-		WHERE id = $3
-		RETURNING id, name, dob
-	`
+if err != nil {
+	return models.User{}, err
+}
 
-	err := r.DB.QueryRow(
+dob := pgtype.Date{
+	Time:  parsedTime,
+	Valid: true,
+}
+
+	if err != nil {
+		return models.User{}, err
+	}
+
+	updatedUser, err := r.Queries.UpdateUser(
 		context.Background(),
-		query,
-		user.Name,
-		user.DOB,
-		id,
-	).Scan(
-		&updatedUser.ID,
-		&updatedUser.Name,
-		&updatedUser.DOB,
+		db.UpdateUserParams{
+			Name: user.Name,
+			Dob:  dob,
+			ID:   int32(id),
+		},
 	)
 
 	if err != nil {
 		return models.User{}, err
 	}
 
-	return updatedUser, nil
+	return mapSQLCUser(updatedUser), nil
 }
-
 func (r *UserRepository) DeleteUser(id int) error {
 
-	query := `
-		DELETE FROM users
-		WHERE id = $1
-	`
-
-	_, err := r.DB.Exec(
+	return r.Queries.DeleteUser(
 		context.Background(),
-		query,
-		id,
+		int32(id),
 	)
-
-	return err
 }
