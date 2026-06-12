@@ -2,19 +2,30 @@ package repository
 
 import (
 	"context"
+	
 
+	db "ainyx-user-api/db/sqlc/generated"
 	"ainyx-user-api/internal/models"
 
 	"github.com/jackc/pgx/v5"
 )
 
 type UserRepository struct {
-	DB *pgx.Conn
+	DB      *pgx.Conn
+	Queries *db.Queries
 }
 
-func NewUserRepository(db *pgx.Conn) *UserRepository {
+func NewUserRepository(dbConn *pgx.Conn) *UserRepository {
 	return &UserRepository{
-		DB: db,
+		DB:      dbConn,
+		Queries: db.New(dbConn),
+	}
+}
+func mapSQLCUser(user db.User) models.User {
+	return models.User{
+		ID:   int(user.ID),
+		Name: user.Name,
+		DOB:  user.Dob.Time,
 	}
 }
 
@@ -48,29 +59,16 @@ func (r *UserRepository) CreateUser(user models.CreateUserRequest) (models.User,
 
 func (r *UserRepository) GetUserByID(id int) (models.User, error) {
 
-	var user models.User
-
-	query := `
-		SELECT id, name, dob
-		FROM users
-		WHERE id = $1
-	`
-
-	err := r.DB.QueryRow(
+	user, err := r.Queries.GetUserByID(
 		context.Background(),
-		query,
-		id,
-	).Scan(
-		&user.ID,
-		&user.Name,
-		&user.DOB,
+		int32(id),
 	)
 
 	if err != nil {
 		return models.User{}, err
 	}
 
-	return user, nil
+	return mapSQLCUser(user), nil
 }
 
 func (r *UserRepository) GetAllUsers() ([]models.User, error) {
