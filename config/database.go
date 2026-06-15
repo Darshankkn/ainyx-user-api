@@ -9,7 +9,7 @@ import (
 
 func ConnectDB() (*pgx.Conn, error) {
 
-	connStr := "postgres://postgres:Darshan@511@localhost:5432/ainyx_users"
+	connStr := "postgres://postgres:<PASSWORD>@localhost:5432/ainyx_users"
 
 	conn, err := pgx.Connect(context.Background(), connStr)
 
