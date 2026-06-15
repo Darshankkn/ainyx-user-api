@@ -11,6 +11,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"ainyx-user-api/internal/logger"
+	"ainyx-user-api/internal/middleware"
 )
 
 func main() {
@@ -32,6 +33,8 @@ func main() {
     defer logger.Log.Sync()
 
 	app := fiber.New()
+	app.Use(middleware.RequestID())
+	app.Use(middleware.RequestLogger())
 
 	routes.SetupRoutes(app, userHandler)
 
